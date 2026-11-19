@@ -1,0 +1,1108 @@
+<meta charset="utf-8">
+<title>La nave Pitágoras</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one-screen game. Storm sky canvas behind; HUD on top, the ship map in the middle, the key bar at the bottom; puzzles open as a sheet over the ship. Single dark "night storm" look by design. */
+:root{
+  --abyss:#0a1620; --storm:#11253a; --swell:#1b3a55; --swell-2:#24496a;
+  --foam:#eaf1f3; --mist:#a3b8c6; --brass:#e0a93f; --brass-deep:#8c6420; --brass-hi:#ffd07a;
+  --signal:#ef5d50; --kelp:#5cc79d; --parchment:#f1e4c3; --parchment-2:#e3d1a6; --ink:#2c2217; --ink-soft:#6b563b;
+  --font-display:"IM Fell English SC", "Georgia", serif;
+  --font-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius:14px;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--abyss);color:var(--foam);font-family:var(--font-body);font-size:16px;line-height:1.5;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible,textarea:focus-visible{outline:3px solid var(--brass-hi);outline-offset:3px}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+#flash{position:fixed;inset:0;background:#dfe9ff;opacity:0;pointer-events:none;z-index:60;transition:opacity .5s ease-out}
+#app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+#app.shake{animation:shake .45s}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(-8px,3px)}40%{transform:translate(7px,-4px)}60%{transform:translate(-5px,2px)}80%{transform:translate(4px,-1px)}}
+
+/* HUD */
+.hud{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:10px;justify-content:space-between}
+.hud[hidden]{display:none!important}
+.crew-tag{display:flex;align-items:center;gap:10px;min-width:0}
+.crew-tag .sigil{width:38px;height:38px;flex:none}
+.crew-tag b{font-family:var(--font-display);font-size:1.35rem;font-weight:400;letter-spacing:.02em;white-space:nowrap}
+.crew-tag small{display:block;color:var(--mist);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;line-height:1}
+.gauges{display:flex;gap:8px;align-items:stretch}
+.gauge{background:color-mix(in srgb,var(--storm) 85%,transparent);border:1px solid var(--swell-2);border-radius:12px;padding:4px 12px;text-align:center;backdrop-filter:blur(4px)}
+.gauge small{display:block;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mist)}
+.gauge output{font-family:var(--font-mono);font-weight:700;font-size:1.3rem;font-variant-numeric:tabular-nums;line-height:1.2}
+.gauge.timer.low output{color:var(--signal);animation:pulse 1s infinite}
+.gauge.timer.over output{color:var(--signal)}
+.gauge.err output{color:var(--signal)}
+@keyframes pulse{50%{opacity:.45}}
+.tools{display:flex;gap:6px}
+.tool-btn{display:flex;align-items:center;gap:6px;background:var(--storm);border:1px solid var(--swell-2);border-radius:10px;padding:8px 12px;font-size:.9rem}
+.tool-btn:hover{border-color:var(--brass)}
+.tool-btn svg{width:18px;height:18px;flex:none}
+@media (max-width:640px){.tool-btn span{display:none}.crew-tag b{font-size:1.1rem}.gauge output{font-size:1.1rem}}
+
+main{flex:1;min-height:0;position:relative;display:flex}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column}
+.screen[hidden]{display:none!important}
+
+/* INTRO */
+#intro{overflow-y:auto;align-items:center;padding-block:24px 40px}
+.intro-card{width:100%;max-width:760px;display:flex;flex-direction:column;gap:22px}
+.eyebrow{font-size:.75rem;letter-spacing:.24em;text-transform:uppercase;color:var(--brass)}
+.intro-card h1{font-family:var(--font-display);font-weight:400;font-size:clamp(2.6rem,8vw,4.6rem);line-height:.95;margin:4px 0 0;text-wrap:balance;text-shadow:0 2px 30px rgba(0,0,0,.6)}
+.story{font-size:1.08rem;color:var(--foam);max-width:62ch;margin:0;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+.story strong{color:var(--brass-hi)}
+.crew-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:560px){.crew-pick{grid-template-columns:1fr}}
+.crew-card{display:flex;align-items:center;gap:12px;text-align:left;background:color-mix(in srgb,var(--storm) 88%,transparent);border:2px solid var(--swell-2);border-radius:var(--radius);padding:12px 14px;transition:transform .15s,border-color .15s}
+.crew-card:hover{transform:translateY(-2px);border-color:var(--mist)}
+.crew-card[aria-pressed="true"]{border-color:var(--brass);box-shadow:0 0 0 4px color-mix(in srgb,var(--brass) 25%,transparent)}
+.crew-card .sigil{width:46px;height:46px;flex:none}
+.crew-card b{font-family:var(--font-display);font-weight:400;font-size:1.3rem;display:block;line-height:1.1}
+.crew-card small{color:var(--mist);font-size:.8rem}
+.rules{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 18px;margin:0;padding:0;list-style:none}
+@media (max-width:560px){.rules{grid-template-columns:1fr}}
+.rules li{display:flex;gap:10px;align-items:flex-start;font-size:.95rem;color:var(--mist)}
+.rules li b{color:var(--foam);font-weight:700}
+.rules svg{width:22px;height:22px;flex:none;margin-top:1px;color:var(--brass)}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.btn{border:none;border-radius:999px;padding:14px 26px;font-weight:700;font-size:1.05rem;letter-spacing:.02em}
+.btn-brass{background:linear-gradient(180deg,var(--brass-hi),var(--brass) 55%,var(--brass-deep));color:var(--ink);box-shadow:0 4px 0 #5a3f12,0 10px 30px rgba(224,169,63,.25)}
+.btn-brass:active{transform:translateY(3px);box-shadow:0 1px 0 #5a3f12}
+.btn-brass:disabled{filter:grayscale(.8) brightness(.6);cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--swell-2);color:var(--foam)}
+.btn-ghost:hover{border-color:var(--mist)}
+.hint-line{color:var(--mist);font-size:.88rem}
+
+/* MAP */
+#map{align-items:center;justify-content:center;gap:6px}
+.map-title{font-family:var(--font-display);font-size:clamp(1.1rem,3vw,1.5rem);color:var(--mist);text-align:center;text-wrap:balance;margin:0}
+.map-title b{color:var(--brass-hi);font-weight:400}
+.ship-wrap{width:100%;max-width:1150px;aspect-ratio:1000/560;max-height:100%;position:relative}
+#shipSvg{width:100%;height:100%;display:block;overflow:visible}
+.rock{animation:rock 7s ease-in-out infinite;transform-origin:510px 420px}
+@keyframes rock{0%,100%{transform:rotate(-2.2deg) translateY(0)}50%{transform:rotate(2.2deg) translateY(8px)}}
+.waves-back{animation:drift 9s linear infinite}
+.waves-front{animation:drift 6s linear infinite reverse}
+@keyframes drift{to{transform:translateX(-240px)}}
+.bob{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(10px) rotate(4deg)}}
+.beam{transform-origin:110px 214px;animation:beam 6s linear infinite}
+@keyframes beam{0%{transform:rotate(-30deg);opacity:.0}10%{opacity:.6}45%{opacity:.6}55%{transform:rotate(40deg);opacity:0}100%{transform:rotate(40deg);opacity:0}}
+.lock{cursor:pointer;outline:none}
+.lock .ring{fill:var(--swell);stroke:#000;stroke-opacity:.35;stroke-width:3}
+.lock .body{fill:var(--mist)}
+.lock .num{font-family:var(--font-mono);font-weight:700;font-size:13px;fill:var(--abyss)}
+.lock .lbl{font-family:var(--font-body);font-weight:700;font-size:20px;fill:var(--foam);paint-order:stroke;stroke:var(--abyss);stroke-width:6px;stroke-linejoin:round}
+.lock.locked{cursor:not-allowed}
+.lock.locked .ring{fill:#2a3b4a}
+.lock.locked .body{fill:#5d7182}
+.lock.locked .lbl{fill:var(--mist);opacity:.7}
+.lock.active .ring{fill:var(--brass)}
+.lock.active .body{fill:var(--ink)}
+.lock.active .glow{animation:glow 1.6s ease-in-out infinite}
+.lock.active .num{fill:var(--brass-hi)}
+@keyframes glow{0%,100%{opacity:.15;transform:scale(1)}50%{opacity:.55;transform:scale(1.25)}}
+.lock .glow{fill:var(--brass);opacity:0;transform-box:fill-box;transform-origin:center}
+.lock.open .ring{fill:var(--kelp)}
+.lock.open .body{fill:var(--abyss)}
+.lock:focus-visible .ring{stroke:var(--brass-hi);stroke-width:6;stroke-opacity:1}
+
+/* KEY BAR */
+.keybar{display:flex;align-items:center;justify-content:center;gap:10px;padding-block:10px 14px;flex-wrap:wrap}
+.keybar[hidden]{display:none!important}
+.keybar .key-ico{width:44px;height:44px;color:var(--brass);flex:none}
+.slots{display:flex;gap:8px}
+.slot{width:52px;height:60px;border-radius:10px;border:2px dashed var(--swell-2);background:color-mix(in srgb,var(--storm) 80%,transparent);display:grid;place-items:center;position:relative;font-family:var(--font-display);font-size:2rem;line-height:1;color:var(--brass-hi);padding:0}
+.slot small{position:absolute;top:3px;left:6px;font-family:var(--font-mono);font-size:.62rem;color:var(--mist)}
+.slot.filled{border-style:solid;border-color:var(--brass);background:linear-gradient(180deg,#3a2c12,#1f1709);box-shadow:inset 0 0 12px rgba(255,208,122,.25)}
+.slot.current{border-color:var(--brass);border-style:solid;animation:pulse 1.6s infinite}
+.slot.pop{animation:popin .7s cubic-bezier(.2,1.6,.4,1)}
+@keyframes popin{0%{transform:scale(.2) rotate(-25deg)}100%{transform:none}}
+@media (max-width:480px){.slot{width:42px;height:50px;font-size:1.6rem}.keybar .key-ico{display:none}.slots{gap:6px}}
+
+/* PUZZLE SHEET */
+.overlay{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center;background:rgba(4,10,16,.55);backdrop-filter:blur(3px);padding-top:max(14px,env(safe-area-inset-top,0px))}
+.overlay[hidden]{display:none!important}
+.sheet{width:100%;max-width:980px;max-height:100%;overflow-y:auto;background:linear-gradient(180deg,var(--storm),#0d1d2d);border:1px solid var(--swell-2);border-bottom:none;border-radius:22px 22px 0 0;padding:20px max(18px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));animation:rise .35s cubic-bezier(.2,.9,.3,1)}
+@keyframes rise{from{transform:translateY(60px);opacity:0}}
+.sheet-head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.sheet-head .padlock{width:52px;height:60px;flex:none}
+.sheet-head h2{font-family:var(--font-display);font-weight:400;font-size:clamp(1.4rem,4vw,2rem);line-height:1.05;margin:0;text-wrap:balance}
+.sheet-head .eyebrow{display:block}
+.close-x{margin-left:auto;align-self:flex-start;background:var(--swell);border:none;border-radius:50%;width:40px;height:40px;display:grid;place-items:center;flex:none}
+.close-x svg{width:18px;height:18px}
+.shackle{transition:transform .6s cubic-bezier(.3,1.6,.5,1)}
+.padlock.opened .shackle{transform:translateY(-12px) rotate(-28deg);transform-origin:38px 22px}
+.puz-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:760px){.puz-grid{grid-template-columns:1fr}}
+.puz-text{font-size:1.12rem;margin:0 0 12px}
+.diagram{background:radial-gradient(ellipse at 50% 40%,#173550,#0e2132);border:1px solid var(--swell-2);border-radius:var(--radius);padding:8px;position:relative}
+.diagram svg{width:100%;height:auto;display:block}
+.diagram figcaption{font-size:.72rem;color:var(--mist);text-align:right;padding:0 6px 2px;letter-spacing:.04em}
+.step{border-top:1px solid var(--swell-2);padding-top:12px;margin-top:12px}
+.step:first-child{border-top:none;margin-top:0;padding-top:0}
+.step h3{font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--brass);margin:0 0 8px;font-weight:700;display:flex;align-items:center;gap:8px}
+.step h3 .tick{color:var(--kelp)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--swell-2);background:var(--swell);border-radius:999px;padding:7px 14px;font-size:.92rem}
+.chip:hover:not(:disabled){border-color:var(--mist)}
+.chip.right{background:var(--kelp);color:var(--abyss);border-color:var(--kelp);font-weight:700}
+.chip.nope{animation:shake .4s;border-color:var(--signal);color:var(--signal)}
+.chip:disabled{cursor:default}
+.note{font-size:.88rem;color:var(--mist);margin:8px 0 0;min-height:1.3em}
+.note.warn{color:#ffb4ab}
+textarea{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;background:var(--parchment);color:var(--ink);border:none;border-radius:10px;padding:10px 12px;font-family:var(--font-mono);font-size:.9rem;line-height:1.5;background-image:repeating-linear-gradient(transparent 0 26px,rgba(107,86,59,.18) 26px 27px);background-attachment:local}
+textarea::placeholder{color:var(--ink-soft)}
+.answers{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;position:relative}
+.ans{display:flex;align-items:center;gap:12px;background:linear-gradient(180deg,#2c4c69,#1d3a55);border:2px solid #34597b;border-radius:12px;padding:12px 14px;font-family:var(--font-mono);font-weight:700;font-size:1.2rem;text-align:left;font-variant-numeric:tabular-nums;transition:transform .12s}
+.ans:hover:not(:disabled){transform:translateY(-2px);border-color:var(--brass)}
+.ans .ltr{width:30px;height:30px;border-radius:50%;background:var(--abyss);display:grid;place-items:center;font-size:.85rem;color:var(--brass);flex:none}
+.ans.wrong{background:#3d1b1b;border-color:var(--signal);color:#ffb4ab;text-decoration:line-through;cursor:not-allowed}
+.ans.right{background:var(--kelp);border-color:var(--kelp);color:var(--abyss)}
+.ans.right .ltr{color:var(--kelp)}
+.answers.chained .ans{filter:blur(2px) brightness(.55);pointer-events:none}
+.chain-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-weight:700;color:var(--brass-hi);font-size:.95rem;padding:10px;text-shadow:0 2px 6px #000;pointer-events:none}
+.chain-msg[hidden]{display:none!important}
+.bottle{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bottle-btn{display:flex;gap:8px;align-items:center;background:transparent;border:1px dashed var(--mist);border-radius:999px;padding:7px 14px;font-size:.9rem;color:var(--mist)}
+.bottle-btn svg{width:20px;height:20px}
+.bottle-btn:hover{color:var(--foam);border-color:var(--foam)}
+.scroll{background:var(--parchment);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:.98rem;width:100%;animation:rise .4s}
+.scroll b{font-family:var(--font-display);font-weight:400;font-size:1.1rem}
+.reveal{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:14px 0 4px}
+.reveal .big-letter{font-family:var(--font-display);font-size:6rem;line-height:1;color:var(--brass-hi);text-shadow:0 0 30px rgba(255,208,122,.6);animation:popin .9s cubic-bezier(.2,1.6,.4,1)}
+.reveal p{margin:0;color:var(--mist)}
+
+/* TOAST */
+#toast{position:fixed;left:50%;top:calc(80px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:70;max-width:min(92vw,520px);background:#3d1b1b;border:2px solid var(--signal);color:#ffe2de;border-radius:14px;padding:12px 18px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#toast[hidden]{display:none!important}
+#toast.show{animation:drop .4s cubic-bezier(.2,1.5,.4,1)}
+@keyframes drop{from{transform:translate(-50%,-30px);opacity:0}}
+#toast .pen{font-family:var(--font-mono);font-weight:700;color:var(--signal);font-size:1.3rem;white-space:nowrap}
+
+/* CALCULATOR */
+#calc{position:fixed;z-index:50;right:max(14px,env(safe-area-inset-right,0px));top:calc(70px + env(safe-area-inset-top,0px));width:300px;max-width:calc(100vw - 28px);background:#16222c;border:2px solid #3a4a57;border-radius:18px;padding:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#calc[hidden]{display:none!important}
+.calc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.75rem;color:var(--mist);letter-spacing:.12em;text-transform:uppercase}
+.calc-top .deg{background:var(--kelp);color:var(--abyss);border-radius:6px;padding:1px 7px;font-weight:700;font-family:var(--font-mono);letter-spacing:0}
+.calc-top button{background:none;border:none;padding:4px}
+.calc-screen{background:#b9c8a4;color:#1d2414;border-radius:10px;padding:8px 10px;font-family:var(--font-mono);min-height:62px;display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;box-shadow:inset 0 2px 6px rgba(0,0,0,.35);overflow:hidden}
+.calc-expr{font-size:.85rem;opacity:.75;word-break:break-all;text-align:right}
+.calc-res{font-size:1.5rem;font-weight:700;white-space:nowrap}
+.calc-round{font-size:.72rem;opacity:.75}
+.calc-keys{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
+.calc-keys button{border:none;border-radius:8px;padding:9px 0;font-family:var(--font-mono);font-size:.92rem;background:#2b3a46;color:var(--foam);box-shadow:0 2px 0 #0d151b}
+.calc-keys button:active{transform:translateY(2px);box-shadow:none}
+.calc-keys .fn{background:#203b52;font-size:.8rem}
+.calc-keys .op{background:#3b4b58}
+.calc-keys .eq{background:var(--brass);color:var(--ink);font-weight:700}
+.calc-keys .clr{background:#7a2f29}
+
+/* LOG (bitácora) */
+#log .sheet{background:var(--parchment);color:var(--ink);border-color:var(--parchment-2)}
+#log h2{font-family:var(--font-display);font-weight:400;font-size:2rem;margin:0}
+#log .eyebrow{color:var(--ink-soft)}
+#log .close-x{background:var(--parchment-2);color:var(--ink)}
+.log-stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.log-stats div{border:1px solid var(--parchment-2);border-radius:10px;padding:6px 12px;background:#f8efd9}
+.log-stats small{display:block;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+.log-stats b{font-family:var(--font-mono);font-size:1.15rem;font-variant-numeric:tabular-nums}
+.log-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.log-list li{border-top:1px dashed #b9a57d;padding-top:10px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.log-list .n{font-family:var(--font-display);font-size:1.8rem;line-height:1;color:var(--ink-soft);grid-row:span 2}
+.log-list .t{font-weight:700}
+.log-list .meta{font-size:.85rem;color:var(--ink-soft)}
+.log-list .proc{grid-column:2;font-family:var(--font-mono);font-size:.82rem;white-space:pre-wrap;background:#f8efd9;border-radius:8px;padding:6px 10px;margin-top:4px}
+.log-foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center}
+.log-foot .btn{padding:10px 18px;font-size:.95rem}
+.btn-ink{background:var(--ink);color:var(--parchment)}
+.btn-ink-ghost{background:transparent;border:1px solid var(--ink-soft);color:var(--ink)}
+.btn-danger{background:#8d2c24;color:#fff}
+
+/* FINAL */
+#final,#win{overflow-y:auto;align-items:center;padding-block:20px 40px}
+.final-card{width:100%;max-width:720px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.final-card h1{font-family:var(--font-display);font-weight:400;font-size:clamp(2.2rem,7vw,3.6rem);margin:0;line-height:1;text-wrap:balance}
+.final-card p{margin:0;color:var(--mist);max-width:56ch}
+.keyhole-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.hole{width:58px;height:70px;border-radius:12px;border:2px solid var(--brass-deep);background:#0c1822;display:grid;place-items:center;font-family:var(--font-display);font-size:2.4rem;color:var(--brass-hi);box-shadow:inset 0 4px 12px rgba(0,0,0,.6)}
+.hole.ok{border-color:var(--kelp)}
+.tiles{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tile{width:58px;height:70px;border-radius:12px;border:none;font-family:var(--font-display);font-size:2.4rem;background:linear-gradient(180deg,var(--brass-hi),var(--brass) 60%,var(--brass-deep));color:var(--ink);box-shadow:0 4px 0 #5a3f12;transition:transform .15s,opacity .2s}
+.tile:hover{transform:translateY(-3px) rotate(-2deg)}
+.tile.used{opacity:.15;pointer-events:none}
+.bad{animation:shake .45s}
+@media (max-width:480px){.hole,.tile{width:44px;height:56px;font-size:1.8rem}}
+.big-key{width:min(320px,80%);height:auto;filter:drop-shadow(0 6px 24px rgba(255,208,122,.35))}
+.big-key.turn{animation:turnkey 1.2s cubic-bezier(.5,0,.3,1.4) forwards}
+@keyframes turnkey{to{transform:rotate(90deg) scale(1.08)}}
+.summary{width:100%;background:var(--parchment);color:var(--ink);border-radius:16px;padding:16px 18px;text-align:left}
+.summary h2{font-family:var(--font-display);font-weight:400;margin:0 0 8px;font-size:1.6rem}
+.summary table{width:100%;border-collapse:collapse;font-size:.92rem;font-variant-numeric:tabular-nums}
+.summary th,.summary td{color:var(--ink);padding:6px 8px;border-bottom:1px dashed #b9a57d;text-align:left}
+.summary th{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.summary .tot td{font-weight:700;border-bottom:none}
+.table-wrap{overflow-x:auto}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:40;width:100%;height:100%}
+
+/* TIMEOUT */
+.modal{background:var(--storm);border:2px solid var(--signal);border-radius:20px;padding:24px;max-width:460px;margin:auto;text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center}
+#timeout{align-items:center;padding:16px}
+.modal h2{font-family:var(--font-display);font-weight:400;font-size:2rem;margin:0}
+.modal p{margin:0;color:var(--mist)}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+<div id="flash" aria-hidden="true"></div>
+<canvas id="confetti" aria-hidden="true" hidden></canvas>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-calc" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="5" width="10" height="4" rx="1" fill="currentColor"/><circle cx="8.5" cy="13" r="1.2" fill="currentColor"/><circle cx="12" cy="13" r="1.2" fill="currentColor"/><circle cx="15.5" cy="13" r="1.2" fill="currentColor"/><circle cx="8.5" cy="17" r="1.2" fill="currentColor"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/><circle cx="15.5" cy="17" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z M20 4h-4a3 3 0 0 0-2 1" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 7v13a2 2 0 0 1 2-2h4V4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M10 2h4v4l2 3v12a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9l2-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h4M10 15h4M10 18h3" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="i-key" viewBox="0 0 64 64"><circle cx="18" cy="32" r="12" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="18" cy="32" r="4" fill="currentColor"/><path d="M30 32h28M50 32v9M42 32v7" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></symbol>
+    <symbol id="sig-kraken" viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="#5b3a7a"/><path d="M14 22c0-8 4.5-12 10-12s10 4 10 12c0 3-1.5 5-3 6 2 2 4 6 1 9-1-3-3-4-4-3 1 3 0 6-4 7 1-3 0-5-1-6-1 1-2 3-1 6-4-1-5-4-4-7-1-1-3 0-4 3-3-3-1-7 1-9-1.5-1-1-3-1-6z" fill="#e8d7ff"/><circle cx="20" cy="20" r="2" fill="#2a1638"/><circle cx="28" cy="20" r="2" fill="#2a1638"/></symbol>
+    <symbol id="sig-tiburones" viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="#1f5a78"/><path d="M8 30c8-2 14-2 20 0 4 1 8 1 12-1-2 4-6 6-12 6-7 0-13-2-20-5z" fill="#d9f0fa"/><path d="M22 29c1-8 4-14 9-17-1 6-1 11 1 17z" fill="#d9f0fa"/></symbol>
+    <symbol id="sig-sirenas" viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="#16725e"/><path d="M24 9c3 4 4 9 2 14-2 5-1 9 3 12 2 1 6 1 8-1-1 4-6 6-10 5-6-2-8-8-6-14 1-4 1-9-1-12z" fill="#d6fbef"/><path d="M29 34c2 3 6 4 9 3-2-3-5-4-9-3zM29 34c-1 3-4 5-8 5 1-3 4-5 8-5z" fill="#d6fbef"/></symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header class="hud" id="hud" hidden>
+    <div class="crew-tag"><svg class="sigil" id="hudSigil"><use href="#sig-kraken"/></svg><div><small>Tripulación</small><b id="hudCrew">Los Kraken</b></div></div>
+    <div class="gauges">
+      <div class="gauge timer" id="timerGauge"><small>Tormenta</small><output id="timer">40:00</output></div>
+      <div class="gauge err"><small>Corrientes</small><output id="errCount">0</output></div>
+    </div>
+    <div class="tools">
+      <button class="tool-btn" id="btnCalc" aria-label="Calculadora científica"><svg><use href="#i-calc"/></svg><span>Calculadora</span></button>
+      <button class="tool-btn" id="btnLog" aria-label="Bitácora"><svg><use href="#i-book"/></svg><span>Bitácora</span></button>
+      <button class="tool-btn" id="btnSound" aria-label="Sonido"><svg id="soundIco"><use href="#i-sound"/></svg></button>
+    </div>
+  </header>
+
+  <main>
+    <!-- INTRO -->
+    <section class="screen" id="intro">
+      <div class="intro-card">
+        <div>
+          <div class="eyebrow">Escape Room II · Trigonometría</div>
+          <h1>La nave Pitágoras</h1>
+        </div>
+        <p class="story">Una tormenta arrastró la nave <strong>Pitágoras</strong> mar adentro. Tienen <strong>40 minutos</strong> y <strong>6 candados</strong> que abrir. Cada candado resuelto les entrega una letra de su llave secreta: con las 6 letras forjan la llave que salva la nave.</p>
+        <div>
+          <div class="eyebrow" style="margin-bottom:8px">Elijan su tripulación</div>
+          <div class="crew-pick" id="crewPick"></div>
+        </div>
+        <ul class="rules">
+          <li><svg><use href="#i-calc"/></svg><span><b>Calculadora en grados (DEG).</b> Redondeen a 1 decimal. Hay una a bordo.</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span><b>Cada error es una corriente marina:</b> resta 1 minuto y queda anotado.</span></li>
+          <li><svg><use href="#i-book"/></svg><span><b>La bitácora</b> anota sola sus letras, errores y pistas.</span></li>
+          <li><svg><use href="#i-bottle"/></svg><span><b>¿Atascados?</b> Abran un mensaje en botella: da una pista y cuesta 1 minuto.</span></li>
+        </ul>
+        <div class="cta-row">
+          <button class="btn btn-brass" id="btnStart" disabled>Elijan una tripulación</button>
+          <button class="btn btn-ghost" id="btnResume" hidden>Continuar partida</button>
+        </div>
+        <p class="hint-line" id="startHint">El reloj empieza a correr al zarpar. Suban el volumen: la tormenta suena.</p>
+      </div>
+    </section>
+
+    <!-- MAP -->
+    <section class="screen" id="map" hidden>
+      <p class="map-title" id="mapTitle">Toquen el candado que brilla: <b>Candado 1</b></p>
+      <div class="ship-wrap"><svg id="shipSvg" viewBox="0 0 1000 560" role="group" aria-label="Mapa de la nave"></svg></div>
+    </section>
+
+    <!-- FINAL -->
+    <section class="screen" id="final" hidden>
+      <div class="final-card">
+        <div class="eyebrow">Reto final</div>
+        <h1>Forjen su llave secreta</h1>
+        <p>Toquen las letras en el orden en que abrieron los candados. Si la palabra es correcta, la llave gira y la nave sale de la tormenta.</p>
+        <svg class="big-key" id="bigKey" viewBox="0 0 64 64" style="color:var(--brass)"><use href="#i-key"/></svg>
+        <div class="keyhole-row" id="holes"></div>
+        <div class="tiles" id="tiles"></div>
+        <button class="btn btn-ghost" id="btnClearKey">Volver a empezar la palabra</button>
+      </div>
+    </section>
+
+    <!-- WIN -->
+    <section class="screen" id="win" hidden>
+      <div class="final-card">
+        <div class="eyebrow">Amanece sobre el mar</div>
+        <h1 id="winTitle">¡Escaparon de la tormenta!</h1>
+        <p>Avisen al Capitán de la misión y entreguen su bitácora. Pueden copiarla o tomarle una captura a esta pantalla.</p>
+        <div class="summary" id="summary"></div>
+        <div class="cta-row" style="justify-content:center">
+          <button class="btn btn-brass" id="btnCopy">Copiar bitácora</button>
+          <button class="btn btn-ghost" id="btnNew">Nueva partida</button>
+        </div>
+        <p class="hint-line" id="copyNote"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="keybar" id="keybar" hidden>
+    <svg class="key-ico"><use href="#i-key"/></svg>
+    <div class="slots" id="slots"></div>
+  </footer>
+</div>
+
+<!-- PUZZLE -->
+<div class="overlay" id="puzzle" hidden role="dialog" aria-modal="true" aria-labelledby="puzTitle">
+  <div class="sheet" id="puzSheet"></div>
+</div>
+
+<!-- LOG -->
+<div class="overlay" id="log" hidden role="dialog" aria-modal="true" aria-label="Bitácora">
+  <div class="sheet" id="logSheet"></div>
+</div>
+
+<!-- TIMEOUT -->
+<div class="overlay" id="timeout" hidden role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2>¡Se acabó el tiempo!</h2>
+    <p>La tormenta alcanzó a la nave. Pueden seguir en tiempo extra: el reloj contará hacia arriba y quedará anotado en la bitácora.</p>
+    <button class="btn btn-brass" id="btnOvertime">Seguir remando</button>
+  </div>
+</div>
+
+<!-- CALC -->
+<div id="calc" hidden role="dialog" aria-label="Calculadora científica">
+  <div class="calc-top"><span>Calculadora <span class="deg">DEG</span></span><button id="calcClose" aria-label="Cerrar calculadora"><svg width="16" height="16"><use href="#i-x"/></svg></button></div>
+  <div class="calc-screen"><div class="calc-expr" id="calcExpr">&nbsp;</div><div class="calc-res" id="calcRes">0</div><div class="calc-round" id="calcRound">&nbsp;</div></div>
+  <div class="calc-keys" id="calcKeys"></div>
+</div>
+
+<div id="toast" hidden role="status" aria-live="assertive"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+const fmt = (n, d = 1) => n.toFixed(d).replace(".", ",");
+const TOTAL = 40 * 60;
+
+/* ------------------------------------------------------------------ DATA */
+const LOCKS = [
+  { title: "El vigía del palo mayor", place: "Palo mayor", tool: "seno",
+    hint: "Conocen la hipotenusa (el cable) y buscan el cateto <b>opuesto</b> al ángulo: sen θ = opuesto ÷ hipotenusa. Despejen: opuesto = hipotenusa · sen θ." },
+  { title: "La escalera del castillo de proa", place: "Castillo de proa", tool: "coseno",
+    hint: "La distancia a la pared es el cateto <b>adyacente</b> al ángulo: cos θ = adyacente ÷ hipotenusa. Entonces adyacente = hipotenusa · cos θ." },
+  { title: "La rampa de carga", place: "Rampa de carga", tool: "seno",
+    hint: "Conocen el cateto opuesto (la altura) y la hipotenusa (la rampa). Usen la inversa: θ = sen⁻¹(opuesto ÷ hipotenusa)." },
+  { title: "Los faros de la costa", place: "Faros", tool: "leysenos",
+    hint: "Fíjense qué lado está <b>frente</b> a cada ángulo. El barco–faro B está frente al ángulo A; el barco–faro A está frente al ángulo B. Usen a ÷ sen A = b ÷ sen B." },
+  { title: "Las boyas de la ruta", place: "Boyas", tool: "leysenos",
+    hint: "sen B = b · sen A ÷ a. Luego usen sen⁻¹. Como B es agudo, quédense con el ángulo menor que 90°." },
+  { title: "El plano del barco", place: "Camarote", tool: "leycosenos",
+    hint: "Conocen dos lados y el ángulo entre ellos: c² = a² + b² − 2ab · cos C. ¡No olviden sacar la raíz al final!" }
+];
+const TOOLS = [
+  { id: "seno", label: "Razón seno" },
+  { id: "coseno", label: "Razón coseno" },
+  { id: "tangente", label: "Razón tangente" },
+  { id: "leysenos", label: "Ley de senos" },
+  { id: "leycosenos", label: "Ley de cosenos" }
+];
+const TOOL_NUDGE = {
+  seno: "Esa no abre este candado. Pregúntense: ¿qué lados del triángulo rectángulo conocen y cuál buscan?",
+  coseno: "Esa no abre este candado. ¿El lado que buscan está junto al ángulo o frente a él?",
+  leysenos: "Esa no abre este candado. ¿Tienen pares de lado y ángulo opuesto?",
+  leycosenos: "Esa no abre este candado. ¿Conocen dos lados y el ángulo que forman entre ellos?"
+};
+
+// Text + diagram per lock, from each crew's numbers
+const TEXT = [
+  p => `En lo alto del palo mayor, el vigía grita: «¡Tierra a la vista!». Un cable de ${p.L} m lo une con la cubierta y forma un ángulo de ${p.t}° con ella. ¿A qué altura sobre la cubierta está el vigía?`,
+  p => `Para llegar a la cabina del capitán, la tripulación apoya una escalera de ${p.L} m contra la pared de la cabina. La escalera forma un ángulo de ${p.t}° con la cubierta. ¿A qué distancia de la pared queda el pie de la escalera?`,
+  p => `Una rampa de ${p.L} m de longitud une la cubierta con el muelle, que está ${p.h} m más arriba. ¿Qué ángulo forma la rampa con la cubierta?`,
+  p => `Los faros A y B y el barco C forman un triángulo. El ángulo en A mide ${p.A}° y el ángulo en B mide ${p.B}°. Si el barco está a ${p.a} km del faro B, ¿a qué distancia está del faro A?`,
+  p => `Tres boyas A, B y C marcan la ruta de la nave. La boya B está a ${p.a} km de la boya C, y esa distancia es opuesta al ángulo A = ${p.A}°. La boya A está a ${p.b} km de la boya C. Si el ángulo B es agudo, ¿cuánto mide B?`,
+  p => `En el plano del barco, la proa, el mástil y el camarote del capitán forman un triángulo. Del mástil a la proa hay ${p.m} m y del camarote a la proa hay ${p.c} m. Las dos líneas forman un ángulo de ${p.t}° en la proa. ¿Qué distancia hay entre el mástil y el camarote?`
+];
+
+const CREWS = {
+  kraken: { name: "Los Kraken", plural: true, word: "ÁNCORA", sigil: "sig-kraken", tagline: "Ocho brazos, cero miedo",
+    p: [{ L: 20, t: 35 }, { L: 8, t: 65 }, { L: 15, h: 9 }, { A: 40, B: 65, a: 12 }, { a: 10, A: 30, b: 14 }, { m: 7, c: 10, t: 60 }],
+    opts: [["16,4 m", "11,5 m", "34,9 m", "14,0 m"], ["3,4 m", "7,3 m", "18,9 m", "17,2 m"], ["53,1°", "31,0°", "60,0°", "36,9°"],
+           ["8,5 km", "19,5 km", "16,9 km", "10,9 km"], ["20,9°", "44,4°", "42,0°", "135,6°"], ["8,9 m", "79,0 m", "12,2 m", "14,8 m"]],
+    ok: [1, 0, 3, 2, 1, 0] },
+  tiburones: { name: "Los Tiburones", plural: true, word: "GALEÓN", sigil: "sig-tiburones", tagline: "Huelen un error a una milla",
+    p: [{ L: 24, t: 40 }, { L: 9, t: 62 }, { L: 13, h: 5 }, { A: 35, B: 70, a: 10 }, { a: 12, A: 35, b: 15 }, { m: 8, c: 12, t: 50 }],
+    opts: [["18,4 m", "37,3 m", "15,4 m", "20,1 m"], ["7,9 m", "4,2 m", "19,2 m", "16,9 m"], ["22,6°", "67,4°", "21,0°", "38,5°"],
+           ["6,1 km", "20,0 km", "9,4 km", "16,4 km"], ["27,3°", "43,8°", "45,8°", "134,2°"], ["84,6 m", "9,2 m", "14,4 m", "18,2 m"]],
+    ok: [2, 1, 0, 3, 2, 1] },
+  sirenas: { name: "Las Sirenas", plural: true, word: "TRITÓN", sigil: "sig-sirenas", tagline: "Cantan, calculan y escapan",
+    p: [{ L: 18, t: 50 }, { L: "7,5", t: 70 }, { L: 17, h: 8 }, { A: 45, B: 60, a: 14 }, { a: 9, A: 40, b: 11 }, { m: 6, c: 9, t: 70 }],
+    opts: [["11,6 m", "23,5 m", "21,5 m", "13,8 m"], ["7,0 m", "21,9 m", "2,6 m", "20,6 m"], ["61,9°", "28,1°", "25,2°", "47,1°"],
+           ["17,1 km", "11,4 km", "18,7 km", "12,1 km"], ["31,7°", "48,9°", "128,2°", "51,8°"], ["80,1 m", "10,8 m", "8,9 m", "12,4 m"]],
+    ok: [3, 2, 1, 0, 3, 2] }
+};
+const SHIP_MSGS = [
+  "¡Una corriente marina desvía la nave!",
+  "¡Una ola barre la cubierta!",
+  "¡Crujen las cuadernas del casco!",
+  "¡El timón se atasca un momento!",
+  "¡El viento rasga una vela!",
+  "¡Un rayo cae cerca del palo mayor!"
+];
+
+/* ------------------------------------------------------------------ STATE */
+const KEY = "nave-pitagoras-v1";
+let state = null;
+function freshState(crew) {
+  return { crew, startedAt: Date.now(), solved: 0, errors: 0, hints: 0, timeoutSeen: false,
+    locks: LOCKS.map(() => ({ tool: false, errors: 0, hint: false, proc: "", wrong: [], done: false, toolTries: 0 })),
+    keyDone: false, finishedAt: null };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s && CREWS[s.crew] ? s : null; } catch (e) { return null; } }
+const crew = () => CREWS[state.crew];
+function remaining(at = Date.now()) {
+  const end = state.finishedAt || at;
+  return TOTAL - (end - state.startedAt) / 1000 - (state.errors + state.hints) * 60;
+}
+function clock(sec) {
+  const s = Math.abs(Math.round(sec));
+  return (sec < 0 ? "+" : "") + String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+/* ------------------------------------------------------------------ AUDIO */
+let actx = null, muted = false, rainGain = null;
+try { muted = localStorage.getItem(KEY + "-mute") === "1"; } catch (e) {}
+function audioInit() {
+  if (actx) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = actx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1400; f.Q.value = .5;
+    rainGain = actx.createGain(); rainGain.gain.value = muted ? 0 : .05;
+    src.connect(f).connect(rainGain).connect(actx.destination); src.start();
+  } catch (e) { actx = null; }
+}
+function noiseBurst(dur, freq, vol) {
+  if (!actx || muted) return;
+  const t = actx.currentTime, len = actx.sampleRate * dur;
+  const buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const s = actx.createBufferSource(); s.buffer = buf;
+  const f = actx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = freq;
+  const g = actx.createGain(); g.gain.setValueAtTime(vol, t);
+  s.connect(f).connect(g).connect(actx.destination); s.start(t);
+}
+function tone(freq, start, dur, type = "sine", vol = .15, slideTo) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + start, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + .05);
+}
+const sfx = {
+  thunder() { noiseBurst(2.2, 180, .9); },
+  wrong() { tone(220, 0, .5, "sawtooth", .12, 70); noiseBurst(1.4, 260, .6); },
+  click() { tone(660, 0, .06, "square", .04); },
+  unlock() { tone(180, 0, .08, "square", .1); tone(120, .09, .1, "square", .1); [523, 659, 784, 1046].forEach((f, i) => tone(f, .2 + i * .11, .6, "triangle", .14)); },
+  nope() { tone(300, 0, .15, "triangle", .08, 200); },
+  win() { [392, 523, 659, 784, 659, 784, 1046].forEach((f, i) => tone(f, i * .15, .7, "triangle", .14)); },
+  bottle() { tone(880, 0, .3, "sine", .08, 1320); tone(1320, .15, .4, "sine", .06, 990); }
+};
+function setMute(m) {
+  muted = m; try { localStorage.setItem(KEY + "-mute", m ? "1" : "0"); } catch (e) {}
+  $("#soundIco").innerHTML = `<use href="#${m ? "i-mute" : "i-sound"}"/>`;
+  if (rainGain) rainGain.gain.value = m ? 0 : (mode === "calm" ? .015 : .05);
+}
+
+/* ------------------------------------------------------------------ SKY CANVAS */
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sky = $("#sky"), sctx = sky.getContext("2d");
+let W = 0, H = 0, drops = [], flashA = 0, bolt = null, mode = "storm", nextStrike = 4000, tPrev = 0;
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight; sky.width = W * dpr; sky.height = H * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drops = Array.from({ length: Math.round(W * H / 6000) }, () => ({ x: Math.random() * W, y: Math.random() * H, l: 10 + Math.random() * 18, v: 600 + Math.random() * 500 }));
+  if (reduce) drawSky(0);
+}
+function makeBolt() {
+  let x = W * (.15 + Math.random() * .7), y = 0; const pts = [[x, y]];
+  while (y < H * .55) { x += (Math.random() - .5) * 60; y += 20 + Math.random() * 30; pts.push([x, y]); }
+  return pts;
+}
+function strike(big) { flashA = big ? .9 : .55; bolt = makeBolt(); if (big !== "silent") sfx.thunder(); }
+function drawSky(dt) {
+  const g = sctx.createLinearGradient(0, 0, 0, H);
+  if (mode === "calm") { g.addColorStop(0, "#1c2f4a"); g.addColorStop(.5, "#a0607a"); g.addColorStop(.8, "#f2a65a"); g.addColorStop(1, "#ffd08a"); }
+  else { g.addColorStop(0, "#04090f"); g.addColorStop(.55, "#0d2032"); g.addColorStop(1, "#13324a"); }
+  sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
+  if (mode === "calm") {
+    sctx.fillStyle = "rgba(255,230,170,.9)"; sctx.beginPath(); sctx.arc(W * .72, H * .78, Math.min(W, H) * .09, 0, Math.PI * 2); sctx.fill();
+    return;
+  }
+  // clouds
+  sctx.fillStyle = "rgba(30,48,66,.55)";
+  for (let i = 0; i < 7; i++) { const cx = ((i * 260 + performance.now() * .006) % (W + 400)) - 200; sctx.beginPath(); sctx.ellipse(cx, 40 + (i % 3) * 30, 220, 60, 0, 0, Math.PI * 2); sctx.fill(); }
+  // rain
+  sctx.strokeStyle = "rgba(170,200,225,.28)"; sctx.lineWidth = 1; sctx.beginPath();
+  for (const d of drops) {
+    d.y += d.v * dt; d.x -= d.v * dt * .25;
+    if (d.y > H) { d.y = -20; d.x = Math.random() * (W + 200); }
+    sctx.moveTo(d.x, d.y); sctx.lineTo(d.x + d.l * .25, d.y - d.l);
+  }
+  sctx.stroke();
+  if (bolt && flashA > .3) {
+    sctx.strokeStyle = `rgba(235,240,255,${flashA})`; sctx.lineWidth = 2.5; sctx.beginPath();
+    bolt.forEach(([x, y], i) => i ? sctx.lineTo(x, y) : sctx.moveTo(x, y)); sctx.stroke();
+  }
+  if (flashA > 0) { sctx.fillStyle = `rgba(200,215,255,${flashA * .35})`; sctx.fillRect(0, 0, W, H); flashA = Math.max(0, flashA - dt * 1.8); }
+}
+function loop(t) {
+  const dt = Math.min((t - tPrev) / 1000, .05); tPrev = t;
+  if (mode === "storm") { nextStrike -= dt * 1000; if (nextStrike < 0) { strike(Math.random() < .5 ? true : "silent"); nextStrike = 7000 + Math.random() * 9000; } }
+  drawSky(dt);
+  requestAnimationFrame(loop);
+}
+addEventListener("resize", resize); resize();
+if (!reduce) requestAnimationFrame(t => { tPrev = t; loop(t); });
+function flashScreen() {
+  const f = $("#flash"); f.style.transition = "none"; f.style.opacity = ".8";
+  requestAnimationFrame(() => { f.style.transition = "opacity .6s ease-out"; f.style.opacity = "0"; });
+  $("#app").classList.remove("shake"); void $("#app").offsetWidth; $("#app").classList.add("shake");
+  flashA = .9; bolt = makeBolt(); if (reduce) drawSky(0);
+}
+
+/* ------------------------------------------------------------------ SHIP SVG */
+const LOCK_POS = [[478, 62], [742, 268], [590, 392], [112, 160], [905, 330], [285, 268]];
+function wavePath(y, amp, len, w0 = -300, w1 = 1500) {
+  let d = `M${w0} ${y}`;
+  for (let x = w0; x < w1; x += len) d += ` q ${len / 4} ${-amp} ${len / 2} 0 t ${len / 2} 0`;
+  return d + ` L${w1} 600 L${w0} 600 Z`;
+}
+function padlockShape(cls = "") {
+  return `<g class="${cls}"><path class="body" d="M-13 -4 h26 a3 3 0 0 1 3 3 v18 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-18 a3 3 0 0 1 3 -3z"/>
+    <path class="body" d="M-9 -4 v-6 a9 9 0 0 1 18 0 v6 h-4 v-6 a5 5 0 0 0 -10 0 v6z"/></g>`;
+}
+function buildShip() {
+  const svg = $("#shipSvg");
+  svg.innerHTML = `
+  <defs>
+    <linearGradient id="hullG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a3a22"/><stop offset="1" stop-color="#26170c"/></linearGradient>
+    <linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d4a68"/><stop offset="1" stop-color="#081521"/></linearGradient>
+    <linearGradient id="sailG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9cfb2"/><stop offset="1" stop-color="#a99e82"/></linearGradient>
+    <radialGradient id="lampG"><stop offset="0" stop-color="#ffe9a8"/><stop offset="1" stop-color="#ffe9a8" stop-opacity="0"/></radialGradient>
+    <clipPath id="seaClip"><rect x="-40" y="0" width="1080" height="600"/></clipPath>
+  </defs>
+  <!-- lighthouse on a rock -->
+  <path d="M40 360 q30 -40 70 -36 q40 -6 76 36z" fill="#16222c"/>
+  <path d="M96 330 L102 226 L118 226 L124 330z" fill="#d8d4c8"/>
+  <path d="M98 300 h24 v10 h-24z M100 262 h20 v10 h-20z" fill="#b63b32"/>
+  <rect x="100" y="210" width="20" height="16" fill="#2b3a44"/><circle cx="110" cy="218" r="6" fill="#ffe9a8"/>
+  <path d="M104 210 l6 -10 l6 10z" fill="#2b3a44"/>
+  <path class="beam" d="M110 214 L-120 180 L-120 250 Z" fill="url(#lampG)" opacity=".5"/>
+  <g clip-path="url(#seaClip)">
+    <path class="waves-back" d="${wavePath(392, 14, 120)}" fill="#163a55"/>
+  </g>
+  <!-- buoys -->
+  <g class="bob" style="transform-origin:880px 420px"><path d="M868 425 l12 -40 l12 40z" fill="#c9443a"/><rect x="872" y="398" width="16" height="7" fill="#eee"/><ellipse cx="880" cy="426" rx="18" ry="6" fill="#2b2b2b"/></g>
+  <g class="bob" style="transform-origin:950px 440px;animation-delay:-1.4s"><path d="M941 444 l9 -30 l9 30z" fill="#e1b43f"/><ellipse cx="950" cy="445" rx="14" ry="5" fill="#2b2b2b"/></g>
+  <!-- the ship -->
+  <g class="rock">
+    <line x1="478" y1="74" x2="380" y2="338" stroke="#c7b48a" stroke-width="2" stroke-dasharray="6 4"/>
+    <line x1="478" y1="60" x2="478" y2="340" stroke="#3b2715" stroke-width="12"/>
+    <line x1="660" y1="130" x2="660" y2="335" stroke="#3b2715" stroke-width="10"/>
+    <line x1="330" y1="170" x2="330" y2="300" stroke="#3b2715" stroke-width="8"/>
+    <line x1="478" y1="60" x2="800" y2="300" stroke="#3b2715" stroke-width="2"/>
+    <line x1="478" y1="60" x2="220" y2="290" stroke="#3b2715" stroke-width="2"/>
+    <path d="M420 120 q60 18 116 0 l-6 86 q-52 16 -104 0z" fill="url(#sailG)" opacity=".93"/>
+    <path d="M414 216 q66 20 128 0 l-8 92 q-56 18 -112 0z" fill="url(#sailG)" opacity=".93"/>
+    <path d="M612 160 q48 14 96 0 l-6 70 q-42 12 -84 0z" fill="url(#sailG)" opacity=".9"/>
+    <path d="M660 140 L790 300 L668 300z" fill="url(#sailG)" opacity=".8"/>
+    <path d="M330 176 L250 280 L330 280z" fill="url(#sailG)" opacity=".8"/>
+    <path d="M478 30 l30 8 l-30 8z" fill="#b63b32"/>
+    <rect x="455" y="70" width="46" height="16" rx="3" fill="#4a3018"/>
+    <!-- hull -->
+    <path d="M196 336 L830 324 Q 818 404 728 444 L 330 448 Q 236 420 196 336 Z" fill="url(#hullG)"/>
+    <path d="M206 350 L822 338" stroke="#e0a93f" stroke-width="3"/>
+    <path d="M224 382 L806 372" stroke="#e0a93f" stroke-width="1.5" opacity=".6"/>
+    <text x="520" y="420" text-anchor="middle" font-family="IM Fell English SC, Georgia, serif" font-size="30" fill="#e0a93f" letter-spacing="6">PITÁGORAS</text>
+    <g fill="#140c05">${[300, 380, 600, 680].map(x => `<circle cx="${x}" cy="400" r="7"/>`).join("")}</g>
+    <!-- stern cabin -->
+    <rect x="214" y="282" width="150" height="56" rx="4" fill="#4a3018"/>
+    <rect x="232" y="296" width="22" height="18" rx="3" fill="#ffd27a" opacity=".85"/><rect x="322" y="296" width="22" height="18" rx="3" fill="#ffd27a" opacity=".85"/>
+    <circle cx="243" cy="305" r="22" fill="url(#lampG)" opacity=".5"/>
+    <!-- forecastle -->
+    <path d="M690 330 L816 322 L816 296 L700 300z" fill="#4a3018"/>
+    <g stroke="#c7b48a" stroke-width="3"><line x1="658" y1="336" x2="694" y2="300"/><line x1="668" y1="338" x2="704" y2="302"/>
+      <line x1="664" y1="328" x2="674" y2="329"/><line x1="672" y1="320" x2="682" y2="321"/><line x1="680" y1="312" x2="690" y2="313"/></g>
+    <!-- cargo ramp -->
+    <path d="M560 344 L620 430 L632 426 L574 342z" fill="#8a6a42"/>
+    <!-- deck lantern -->
+    <circle cx="560" cy="318" r="5" fill="#ffd27a"/><circle cx="560" cy="318" r="26" fill="url(#lampG)" opacity=".45"/>
+  </g>
+  <g clip-path="url(#seaClip)">
+    <path class="waves-front" d="${wavePath(430, 18, 160)}" fill="url(#seaG)" opacity=".96"/>
+    <path class="waves-back" d="${wavePath(486, 12, 120)}" fill="#0b1e2e" opacity=".95"/>
+  </g>
+  <g class="rock"><g id="locksInShip"></g></g>
+  <g id="locksOut"></g>`;
+  LOCK_POS.forEach(([x, y], i) => {
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute("class", "lock"); g.setAttribute("tabindex", "0"); g.setAttribute("role", "button"); g.dataset.i = i;
+    g.setAttribute("transform", `translate(${x} ${y})`);
+    const lblY = (i === 0 || i === 2) ? -46 : 56;
+    g.innerHTML = `<circle class="glow" r="40"/><circle class="ring" r="32"/>
+      <g transform="translate(0 -2) scale(1.05)">${padlockShape()}</g>
+      <text class="num" text-anchor="middle" y="18" font-size="13">${i + 1}</text>
+      <text class="lbl" text-anchor="middle" y="${lblY}">${LOCKS[i].place}</text>`;
+    // number sits on the lock body
+    g.querySelector(".num").setAttribute("y", "14");
+    ((i === 3 || i === 4) ? $("#locksOut") : $("#locksInShip")).appendChild(g);
+    g.addEventListener("click", () => tryOpen(i));
+    g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tryOpen(i); } });
+  });
+}
+function refreshMap() {
+  document.querySelectorAll(".lock").forEach(g => {
+    const i = +g.dataset.i, st = i < state.solved ? "open" : i === state.solved ? "active" : "locked";
+    g.setAttribute("class", "lock " + st);
+    const lbl = st === "open" ? `${LOCKS[i].place} · ${crew().word[i]}` : LOCKS[i].place;
+    g.querySelector(".lbl").textContent = lbl;
+    g.setAttribute("aria-label", `Candado ${i + 1}, ${LOCKS[i].place}: ${st === "open" ? "abierto" : st === "active" ? "listo para abrir" : "bloqueado"}`);
+    g.querySelector(".num").textContent = st === "open" ? "✓" : i + 1;
+  });
+  $("#mapTitle").innerHTML = state.solved < 6
+    ? `Toquen el candado que brilla: <b>Candado ${state.solved + 1} · ${LOCKS[state.solved].title}</b>`
+    : `¡Los 6 candados están abiertos! <b>Forjen la llave</b>`;
+  renderSlots();
+}
+function renderSlots() {
+  const w = crew().word;
+  $("#slots").innerHTML = [...w].map((ch, i) =>
+    `<button class="slot ${i < state.solved ? "filled" : ""} ${i === state.solved ? "current" : ""}" data-i="${i}" aria-label="Letra ${i + 1}${i < state.solved ? ": " + ch : ""}"><small>${i + 1}</small>${i < state.solved ? ch : ""}</button>`).join("");
+  $("#slots").querySelectorAll(".slot").forEach(b => b.addEventListener("click", () => tryOpen(+b.dataset.i)));
+}
+function tryOpen(i) {
+  if (i > state.solved) { toast(`Primero abran el candado ${state.solved + 1}. Los candados se abren en orden.`, "", true); sfx.nope(); return; }
+  if (state.solved >= 6 && !state.keyDone) { showScreen("final"); return; }
+  sfx.click(); openPuzzle(i);
+}
+
+/* ------------------------------------------------------------------ DIAGRAMS */
+function triSVG(spec) {
+  // spec: V = [[x,y]x3] in math coords; names; sides {"01": [label, unknown]}, angles {0:[label, unknown]}, right: idx
+  const VW = 360, VH = 250, pad = 46;
+  const xs = spec.V.map(v => v[0]), ys = spec.V.map(v => v[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const s = Math.min((VW - 2 * pad) / (maxX - minX || 1), (VH - 2 * pad) / (maxY - minY || 1));
+  const ox = (VW - (maxX - minX) * s) / 2, oy = (VH - (maxY - minY) * s) / 2;
+  const P = spec.V.map(([x, y]) => [ox + (x - minX) * s, VH - oy - (y - minY) * s]);
+  const cx = (P[0][0] + P[1][0] + P[2][0]) / 3, cy = (P[0][1] + P[1][1] + P[2][1]) / 3;
+  const unit = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
+  const away = (pt, dist) => { const u = unit([cx, cy], pt); return [pt[0] + u[0] * dist, pt[1] + u[1] * dist]; };
+  let out = `<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Diagrama del problema">`;
+  out += `<polygon points="${P.map(p => p.join(",")).join(" ")}" fill="rgba(224,169,63,.08)" stroke="#eaf1f3" stroke-width="2.5" stroke-linejoin="round"/>`;
+  const txt = (x, y, t, unk, size = 15) => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${size}" fill="${unk ? "#ffd07a" : "#eaf1f3"}" stroke="#0e2132" stroke-width="5" paint-order="stroke" stroke-linejoin="round">${t}</text>`;
+  for (const [k, [label, unk]] of Object.entries(spec.sides || {})) {
+    const a = P[+k[0]], b = P[+k[1]];
+    if (unk) out += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#ffd07a" stroke-width="4" stroke-dasharray="8 6" stroke-linecap="round"/>`;
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], u = unit([cx, cy], m);
+    out += txt(m[0] + u[0] * 24, m[1] + u[1] * 18, label, unk);
+  }
+  if (spec.right !== undefined) {
+    const i = spec.right, o = [0, 1, 2].filter(j => j !== i), u1 = unit(P[i], P[o[0]]), u2 = unit(P[i], P[o[1]]), r = 13;
+    out += `<path d="M${P[i][0] + u1[0] * r} ${P[i][1] + u1[1] * r} L${P[i][0] + (u1[0] + u2[0]) * r} ${P[i][1] + (u1[1] + u2[1]) * r} L${P[i][0] + u2[0] * r} ${P[i][1] + u2[1] * r}" fill="none" stroke="#a3b8c6" stroke-width="1.6"/>`;
+  }
+  for (const [k, [label, unk]] of Object.entries(spec.angles || {})) {
+    const i = +k, o = [0, 1, 2].filter(j => j !== i), u1 = unit(P[i], P[o[0]]), u2 = unit(P[i], P[o[1]]), r = 26;
+    const cross = u1[0] * u2[1] - u1[1] * u2[0];
+    out += `<path d="M${P[i][0] + u1[0] * r} ${P[i][1] + u1[1] * r} A${r} ${r} 0 0 ${cross > 0 ? 1 : 0} ${P[i][0] + u2[0] * r} ${P[i][1] + u2[1] * r}" fill="${unk ? "rgba(255,208,122,.25)" : "none"}" stroke="${unk ? "#ffd07a" : "#a3b8c6"}" stroke-width="2"/>`;
+    const bx = u1[0] + u2[0], by = u1[1] + u2[1], bl = Math.hypot(bx, by) || 1;
+    out += txt(P[i][0] + bx / bl * 50, P[i][1] + by / bl * 50, label, unk, 14);
+  }
+  spec.names.forEach((n, i) => {
+    if (!n) return;
+    const p = away(P[i], 22);
+    out += `<circle cx="${P[i][0]}" cy="${P[i][1]}" r="4" fill="#eaf1f3"/>`;
+    out += `<text x="${p[0].toFixed(1)}" y="${p[1].toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="Atkinson Hyperlegible, sans-serif" font-size="13" fill="#a3b8c6">${n}</text>`;
+  });
+  return out + "</svg>";
+}
+function diagramFor(i, p) {
+  if (i <= 2) {
+    const t = i === 2 ? deg(Math.asin(p.h / p.L)) : p.t, th = rad(t);
+    const V = [[0, 0], [Math.cos(th), Math.sin(th)], [Math.cos(th), 0]];
+    if (i === 0) return triSVG({ V, names: ["Cubierta", "Vigía", "Pie del mástil"], right: 2,
+      sides: { "01": [`${p.L} m`], "12": ["h = ?", true] }, angles: { 0: [`${p.t}°`] } });
+    if (i === 1) return triSVG({ V, names: ["Pie de la escalera", "", "Pared"], right: 2,
+      sides: { "01": [`${p.L} m`], "02": ["x = ?", true] }, angles: { 0: [`${p.t}°`] } });
+    return triSVG({ V, names: ["Cubierta", "Muelle", ""], right: 2,
+      sides: { "01": [`${p.L} m`], "12": [`${p.h} m`] }, angles: { 0: ["θ = ?", true] } });
+  }
+  if (i === 3 || i === 4) {
+    const A = p.A, B = i === 3 ? p.B : deg(Math.asin(p.b * Math.sin(rad(p.A)) / p.a));
+    const b = Math.sin(rad(B)) / Math.sin(rad(A + B));
+    const V = [[0, 0], [1, 0], [b * Math.cos(rad(A)), b * Math.sin(rad(A))]];
+    if (i === 3) return triSVG({ V, names: ["Faro A", "Faro B", "Barco C"],
+      sides: { "12": [`${p.a} km`], "02": ["? km", true] }, angles: { 0: [`${p.A}°`], 1: [`${p.B}°`] } });
+    return triSVG({ V, names: ["Boya A", "Boya B", "Boya C"],
+      sides: { "12": [`${p.a} km`], "02": [`${p.b} km`] }, angles: { 0: [`${p.A}°`], 1: ["B = ?", true] } });
+  }
+  const th = rad(p.t);
+  return triSVG({ V: [[0, 0], [p.m, 0], [p.c * Math.cos(th), p.c * Math.sin(th)]], names: ["Proa", "Mástil", "Camarote"],
+    sides: { "01": [`${p.m} m`], "02": [`${p.c} m`], "12": ["? m", true] }, angles: { 0: [`${p.t}°`] } });
+}
+
+/* ------------------------------------------------------------------ PUZZLE */
+let openIdx = -1;
+function padlockBig(opened) {
+  return `<svg class="padlock ${opened ? "opened" : ""}" viewBox="0 0 76 88" aria-hidden="true">
+    <path class="shackle" d="M18 40 V24 a20 20 0 0 1 40 0 V40 h-9 V24 a11 11 0 0 0 -22 0 V40z" fill="#c9ccd1"/>
+    <rect x="6" y="38" width="64" height="46" rx="8" fill="#e0a93f"/><rect x="6" y="38" width="64" height="10" rx="5" fill="#ffd07a" opacity=".6"/>
+    <circle cx="38" cy="58" r="6" fill="#2c2217"/><rect x="35" y="60" width="6" height="14" rx="2" fill="#2c2217"/></svg>`;
+}
+function openPuzzle(i) {
+  openIdx = i; renderPuzzle(); $("#puzzle").hidden = false;
+  setTimeout(() => $("#puzSheet .close-x")?.focus(), 50);
+}
+function closePuzzle() { $("#puzzle").hidden = true; openIdx = -1; refreshMap(); }
+function renderPuzzle(justSolved) {
+  const i = openIdx, L = LOCKS[i], c = crew(), st = state.locks[i], p = c.p[i];
+  const solved = i < state.solved;
+  const procOk = true;
+  let h = `<div class="sheet-head">${padlockBig(solved && !justSolved)}<div><span class="eyebrow">Candado ${i + 1} de 6</span><h2 id="puzTitle">${L.title}</h2></div>
+    <button class="close-x" aria-label="Volver al barco"><svg><use href="#i-x"/></svg></button></div>
+    <div class="puz-grid"><div>
+      <p class="puz-text">${TEXT[i](p)}</p>
+      <figure class="diagram" style="margin:0">${diagramFor(i, p)}<figcaption>Diagrama aproximado, no a escala exacta</figcaption></figure>
+    </div><div>`;
+  // step 1: tool
+  h += `<div class="step"><h3>${st.tool ? '<span class="tick">✓</span>' : "1 ·"} ¿Qué herramienta abre este candado?</h3><div class="chips">`;
+  h += TOOLS.map(t => `<button class="chip ${st.tool && t.id === L.tool ? "right" : ""}" data-tool="${t.id}" ${st.tool ? "disabled" : ""}>${t.label}</button>`).join("");
+  h += `</div><p class="note" id="toolNote">${st.tool ? "¡Correcto! Ahora resuelvan con la calculadora." : ""}</p></div>`;
+  if (st.tool) {
+    h += `<div class="step"><h3>2 · Elijan la respuesta</h3><div class="answers ${procOk || solved ? "" : "chained"}" id="answers">`;
+    h += c.opts[i].map((o, k) => {
+      const cls = solved && k === c.ok[i] ? "right" : st.wrong.includes(k) ? "wrong" : "";
+      return `<button class="ans ${cls}" data-k="${k}" ${solved || st.wrong.includes(k) ? "disabled" : ""}><span class="ltr">${"ABCD"[k]}</span>${o}</button>`;
+    }).join("");
+    h += `<div class="chain-msg" id="chainMsg" ${procOk || solved ? "hidden" : ""}>Escriban su procedimiento para liberar las respuestas</div></div></div>`;
+    if (!solved) {
+      h += `<div class="step bottle">${st.hint
+        ? `<div class="scroll"><b>Mensaje en botella:</b> ${L.hint}</div>`
+        : `<button class="bottle-btn" id="btnHint"><svg><use href="#i-bottle"/></svg>Abrir mensaje en botella (−1 min)</button>`}</div>`;
+    }
+  }
+  if (solved) {
+    const last = i === 5;
+    h += `<div class="step reveal"><p>Letra ${i + 1} de 6</p><div class="big-letter">${c.word[i]}</div>
+      <p>Anótenla en su bitácora, en orden.</p>
+      <button class="btn btn-brass" id="btnNext">${last ? "Forjar la llave" : "Ir al candado " + (i + 2)}</button></div>`;
+  }
+  h += `</div></div>`;
+  const sheet = $("#puzSheet"); sheet.innerHTML = h;
+  if (justSolved) requestAnimationFrame(() => setTimeout(() => sheet.querySelector(".padlock").classList.add("opened"), 60));
+  sheet.querySelector(".close-x").onclick = closePuzzle;
+  sheet.querySelectorAll(".chip").forEach(b => b.onclick = () => pickTool(b));
+  const pb = $("#procBox");
+  if (pb) pb.oninput = () => {
+    st.proc = pb.value; save();
+    const ok = st.proc.trim().length >= 8;
+    $("#answers").classList.toggle("chained", !ok && !solved); $("#chainMsg").hidden = ok || solved;
+  };
+  sheet.querySelectorAll(".ans").forEach(b => b.onclick = () => answer(+b.dataset.k, b));
+  const hb = $("#btnHint"); if (hb) hb.onclick = () => { st.hint = true; state.hints++; save(); sfx.bottle(); renderPuzzle(); toast("Abrieron un mensaje en botella.", "−1:00"); };
+  const nb = $("#btnNext"); if (nb) nb.onclick = () => {
+    if (i === 5) { closePuzzle(); showScreen("final"); }
+    else { openIdx = i + 1; renderPuzzle(); sheet.scrollTop = 0; refreshMap(); }
+  };
+  if (justSolved) { const r = sheet.querySelector(".reveal"); r && r.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }); }
+}
+function pickTool(btn) {
+  const i = openIdx, st = state.locks[i];
+  if (btn.dataset.tool === LOCKS[i].tool) { st.tool = true; save(); sfx.click(); renderPuzzle(); }
+  else {
+    st.toolTries++; save(); sfx.nope();
+    btn.classList.remove("nope"); void btn.offsetWidth; btn.classList.add("nope");
+    const n = $("#toolNote"); n.className = "note warn"; n.textContent = TOOL_NUDGE[LOCKS[i].tool] + " (Sin penalización.)";
+  }
+}
+function answer(k, btn) {
+  const i = openIdx, c = crew(), st = state.locks[i];
+  if (k === c.ok[i]) {
+    st.done = true; state.solved = Math.max(state.solved, i + 1); save();
+    sfx.unlock(); renderPuzzle(true); refreshMap();
+    const s = document.querySelector(`.slot[data-i="${i}"]`); s && s.classList.add("pop");
+  } else {
+    st.wrong.push(k); st.errors++; state.errors++; save();
+    sfx.wrong(); flashScreen();
+    btn.classList.add("wrong"); btn.disabled = true;
+    toast(SHIP_MSGS[Math.floor(Math.random() * SHIP_MSGS.length)] + " Revisen su procedimiento.", "−1:00");
+    tick();
+  }
+}
+function escapeHtml(s) { return s.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch])); }
+
+/* ------------------------------------------------------------------ TOAST */
+let toastT = 0;
+function toast(msg, pen, soft) {
+  const t = $("#toast");
+  t.innerHTML = `${pen ? `<span class="pen">${pen}</span>` : ""}<span>${msg}</span>`;
+  t.style.background = soft ? "var(--storm)" : ""; t.style.borderColor = soft ? "var(--brass)" : "";
+  t.hidden = false; t.classList.remove("show"); void t.offsetWidth; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3600);
+}
+
+/* ------------------------------------------------------------------ TIMER */
+function tick() {
+  if (!state) return;
+  const r = remaining();
+  $("#timer").textContent = clock(r);
+  $("#errCount").textContent = state.errors;
+  const g = $("#timerGauge");
+  g.classList.toggle("low", r > 0 && r < 300 && !state.finishedAt);
+  g.classList.toggle("over", r <= 0);
+  if (r <= 0 && !state.timeoutSeen && !state.finishedAt) {
+    state.timeoutSeen = true; save(); $("#timeout").hidden = false; sfx.thunder(); flashScreen();
+  }
+}
+setInterval(tick, 500);
+$("#btnOvertime").onclick = () => { $("#timeout").hidden = true; };
+
+/* ------------------------------------------------------------------ CALCULATOR */
+const CK = [
+  ["sin", "sin(", "fn"], ["cos", "cos(", "fn"], ["tan", "tan(", "fn"], ["√", "√(", "fn"], ["C", "C", "clr"],
+  ["sin⁻¹", "sin⁻¹(", "fn"], ["cos⁻¹", "cos⁻¹(", "fn"], ["tan⁻¹", "tan⁻¹(", "fn"], ["x²", "²", "fn"], ["⌫", "DEL", "op"],
+  ["7", "7"], ["8", "8"], ["9", "9"], ["(", "(", "op"], [")", ")", "op"],
+  ["4", "4"], ["5", "5"], ["6", "6"], ["×", "×", "op"], ["÷", "÷", "op"],
+  ["1", "1"], ["2", "2"], ["3", "3"], ["+", "+", "op"], ["−", "−", "op"],
+  ["0", "0"], [".", "."], ["π", "π", "op"], ["^", "^", "op"], ["=", "=", "eq"]
+];
+let ctoks = [], cAns = null;
+function calcRender(res) {
+  $("#calcExpr").textContent = ctoks.join("") || " ";
+  if (res !== undefined) {
+    $("#calcRes").textContent = res;
+    $("#calcRound").textContent = typeof cAns === "number" && isFinite(cAns) ? "Redondeado a 1 decimal: " + fmt(cAns) : " ";
+  }
+}
+function calcEval() {
+  const map = { "sin(": "S(", "cos(": "C(", "tan(": "T(", "sin⁻¹(": "AS(", "cos⁻¹(": "AC(", "tan⁻¹(": "AT(", "√(": "Math.sqrt(", "²": "**2", "×": "*", "÷": "/", "−": "-", "π": "Math.PI", "^": "**" };
+  let js = ctoks.map(t => map[t] ?? t).join("");
+  const open = (js.match(/\(/g) || []).length - (js.match(/\)/g) || []).length;
+  js += ")".repeat(Math.max(0, open));
+  if (!/^[0-9+\-*/().MathsqrtPISCTA ]*$/.test(js)) throw new Error("bad");
+  const f = new Function("S", "C", "T", "AS", "AC", "AT", "return (" + js + ")");
+  return f(x => Math.sin(rad(x)), x => Math.cos(rad(x)), x => Math.tan(rad(x)), x => deg(Math.asin(x)), x => deg(Math.acos(x)), x => deg(Math.atan(x)));
+}
+function calcPress(v) {
+  sfx.click();
+  if (v === "C") { ctoks = []; cAns = null; calcRender("0"); return; }
+  if (v === "DEL") { ctoks.pop(); calcRender(); return; }
+  if (v === "=") {
+    try { const r = calcEval(); cAns = r; calcRender(isFinite(r) ? String(+r.toPrecision(10)).replace(".", ",") : "Error"); ctoks = isFinite(r) ? [String(+r.toPrecision(10))] : []; }
+    catch (e) { cAns = null; calcRender("Error"); ctoks = []; }
+    return;
+  }
+  if (ctoks.length === 1 && cAns !== null && /^[0-9.]/.test(v) && /^[\d.]+$/.test(ctoks[0])) ctoks = [];
+  cAns = null; ctoks.push(v); calcRender();
+}
+$("#calcKeys").innerHTML = CK.map(([l, v, cls]) => `<button class="${cls || ""}" data-v="${v}">${l}</button>`).join("");
+$("#calcKeys").addEventListener("click", e => { const b = e.target.closest("button"); if (b) calcPress(b.dataset.v); });
+$("#btnCalc").onclick = () => { $("#calc").hidden = !$("#calc").hidden; };
+$("#calcClose").onclick = () => { $("#calc").hidden = true; };
+document.addEventListener("keydown", e => {
+  if ($("#calc").hidden || e.target.tagName === "TEXTAREA") return;
+  const m = { "*": "×", "/": "÷", "-": "−", "Enter": "=", "Backspace": "DEL", "Escape": "C", ",": "." };
+  const v = m[e.key] ?? e.key;
+  if (/^[0-9.+()^]$/.test(v) || ["×", "÷", "−", "=", "DEL", "C"].includes(v)) { e.preventDefault(); calcPress(v); }
+});
+
+/* ------------------------------------------------------------------ BITÁCORA */
+let resetArmed = false;
+function renderLog() {
+  const c = crew(), r = remaining();
+  let h = `<div class="sheet-head"><div><span class="eyebrow">Bitácora de a bordo</span><h2>${c.name}</h2></div>
+    <button class="close-x" aria-label="Cerrar bitácora"><svg><use href="#i-x"/></svg></button></div>
+    <div class="log-stats"><div><small>Tiempo</small><b>${clock(r)}</b></div><div><small>Corrientes (errores)</small><b>${state.errors}</b></div>
+    <div><small>Mensajes en botella</small><b>${state.hints}</b></div><div><small>Letras</small><b>${c.word.slice(0, state.solved) || "—"}</b></div></div>
+    <ol class="log-list">`;
+  LOCKS.forEach((L, i) => {
+    const st = state.locks[i];
+    const status = i < state.solved ? `Abierto · letra <b>${c.word[i]}</b>` : i === state.solved ? "En curso" : "Bloqueado";
+    h += `<li><span class="n">${i + 1}</span><span class="t">${L.title}</span>
+      <span class="meta">${status} · ${st.errors} error${st.errors === 1 ? "" : "es"}${st.hint ? " · usó pista" : ""}</span>
+      ${st.proc.trim() ? `<div class="proc">${escapeHtml(st.proc)}</div>` : ""}</li>`;
+  });
+  h += `</ol><div class="log-foot"><button class="btn btn-ink" id="logCopy">Copiar bitácora</button>
+    <button class="btn ${resetArmed ? "btn-danger" : "btn-ink-ghost"}" id="logReset">${resetArmed ? "Sí, borrar y empezar de nuevo" : "Reiniciar partida"}</button>
+    <span class="hint-line" id="logNote" style="color:var(--ink-soft)"></span></div>`;
+  $("#logSheet").innerHTML = h;
+  $("#logSheet .close-x").onclick = () => { $("#log").hidden = true; resetArmed = false; };
+  $("#logCopy").onclick = () => copyLog($("#logNote"));
+  $("#logReset").onclick = () => {
+    if (!resetArmed) { resetArmed = true; renderLog(); $("#logNote").textContent = "Se perderá el progreso de esta tripulación."; return; }
+    resetArmed = false; try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
+  };
+}
+$("#btnLog").onclick = () => { renderLog(); $("#log").hidden = false; };
+function logText() {
+  const c = crew(), r = remaining();
+  const used = (state.finishedAt || Date.now()) - state.startedAt;
+  let s = `ESCAPE ROOM II · LA NAVE PITÁGORAS\nTripulación: ${c.name}\nLlave: ${state.keyDone ? c.word : c.word.slice(0, state.solved)}\n`;
+  s += `Tiempo jugado: ${clock(used / 1000)} · Errores (corrientes): ${state.errors} · Pistas: ${state.hints}\n`;
+  s += `Tiempo restante con penalizaciones: ${clock(r)}${r < 0 ? " (tiempo extra)" : ""}\n\n`;
+  LOCKS.forEach((L, i) => {
+    const st = state.locks[i];
+    s += `Candado ${i + 1} · ${L.title}: ${i < state.solved ? "abierto (" + c.word[i] + ")" : "sin abrir"}, ${st.errors} error(es)${st.hint ? ", usó pista" : ""}\n`;
+    if (st.proc.trim()) s += `  Procedimiento: ${st.proc.trim().replace(/\n/g, " / ")}\n`;
+  });
+  return s;
+}
+async function copyLog(noteEl) {
+  const text = logText();
+  try { await navigator.clipboard.writeText(text); noteEl.textContent = "Bitácora copiada. Péguenla en un mensaje para su docente."; }
+  catch (e) {
+    noteEl.textContent = "No se pudo copiar automáticamente. Seleccionen el texto de abajo.";
+    const pre = document.createElement("textarea"); pre.value = text; pre.readOnly = true; pre.style.marginTop = "8px"; pre.style.minHeight = "160px";
+    noteEl.after(pre); pre.select();
+  }
+}
+
+/* ------------------------------------------------------------------ FINAL KEY */
+let picked = [];
+function renderFinal() {
+  const w = [...crew().word];
+  const order = w.map((ch, i) => ({ ch, i }));
+  for (let j = order.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [order[j], order[r]] = [order[r], order[j]]; }
+  if (order.every((o, j) => o.i === j)) order.push(order.shift());
+  picked = [];
+  $("#holes").innerHTML = w.map((_, i) => `<div class="hole" data-i="${i}"></div>`).join("");
+  $("#tiles").innerHTML = order.map(o => `<button class="tile" data-i="${o.i}">${o.ch}</button>`).join("");
+  $("#bigKey").classList.remove("turn");
+  $("#tiles").querySelectorAll(".tile").forEach(b => b.onclick = () => {
+    sfx.click(); picked.push(b); b.classList.add("used");
+    const holes = $("#holes").children; holes[picked.length - 1].textContent = b.textContent;
+    if (picked.length === w.length) checkKey();
+  });
+}
+function checkKey() {
+  const w = crew().word, got = picked.map(b => b.textContent).join("");
+  if (got === w) {
+    [...$("#holes").children].forEach(h => h.classList.add("ok"));
+    $("#bigKey").classList.add("turn"); sfx.unlock();
+    state.keyDone = true; state.finishedAt = Date.now(); save();
+    setTimeout(win, reduce ? 200 : 1400);
+  } else {
+    sfx.nope(); $("#holes").classList.add("bad");
+    toast("La llave no gira. Revisen el orden de las letras en su bitácora. (Sin penalización.)", "", true);
+    setTimeout(() => { $("#holes").classList.remove("bad"); renderFinalKeepOrder(); }, 600);
+  }
+}
+function renderFinalKeepOrder() {
+  picked.forEach(b => b.classList.remove("used")); picked = [];
+  [...$("#holes").children].forEach(h => h.textContent = "");
+}
+$("#btnClearKey").onclick = renderFinalKeepOrder;
+
+/* ------------------------------------------------------------------ WIN */
+function win() {
+  mode = "calm"; if (rainGain) rainGain.gain.value = muted ? 0 : .015;
+  if (reduce) drawSky(0);
+  sfx.win(); showScreen("win"); confetti();
+}
+function renderWin() {
+  const c = crew(), r = remaining(), used = (state.finishedAt - state.startedAt) / 1000;
+  $("#winTitle").textContent = `¡${c.name} escaparon de la tormenta!`;
+  let h = `<h2>Bitácora de ${c.name}</h2><div class="log-stats" style="margin-top:0">
+    <div><small>Llave</small><b>${c.word}</b></div><div><small>Tiempo jugado</small><b>${clock(used)}</b></div>
+    <div><small>Errores</small><b>${state.errors}</b></div><div><small>Pistas</small><b>${state.hints}</b></div>
+    <div><small>Tiempo restante</small><b>${clock(r)}</b></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Candado</th><th>Letra</th><th>Errores</th><th>Pista</th></tr></thead><tbody>`;
+  LOCKS.forEach((L, i) => { const st = state.locks[i]; h += `<tr><td>${i + 1} · ${L.title}</td><td>${c.word[i]}</td><td>${st.errors}</td><td>${st.hint ? "Sí" : "—"}</td></tr>`; });
+  h += `<tr class="tot"><td>Total</td><td>${c.word}</td><td>${state.errors}</td><td>${state.hints}</td></tr></tbody></table></div>`;
+  $("#summary").innerHTML = h;
+}
+$("#btnCopy").onclick = () => copyLog($("#copyNote"));
+$("#btnNew").onclick = () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); };
+function confetti() {
+  if (reduce) return;
+  const cv = $("#confetti"), x = cv.getContext("2d"); cv.hidden = false;
+  cv.width = innerWidth; cv.height = innerHeight;
+  const cols = ["#ffd07a", "#e0a93f", "#5cc79d", "#eaf1f3", "#ef5d50", "#7fb6ff"];
+  const ps = Array.from({ length: 180 }, () => ({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * .6, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 3, r: Math.random() * 6, s: 4 + Math.random() * 6, c: cols[Math.floor(Math.random() * cols.length)] }));
+  let n = 0;
+  (function f() {
+    x.clearRect(0, 0, cv.width, cv.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.r += .1; x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore(); });
+    if (++n < 360) requestAnimationFrame(f); else cv.hidden = true;
+  })();
+}
+
+/* ------------------------------------------------------------------ SCREENS */
+function showScreen(name) {
+  ["intro", "map", "final", "win"].forEach(s => $("#" + s).hidden = s !== name);
+  $("#hud").hidden = name === "intro";
+  $("#keybar").hidden = name !== "map";
+  if (state) {
+    $("#hudCrew").textContent = crew().name;
+    $("#hudSigil").innerHTML = `<use href="#${crew().sigil}"/>`;
+  }
+  if (name === "map") refreshMap();
+  if (name === "final") renderFinal();
+  if (name === "win") renderWin();
+  tick();
+}
+
+/* ------------------------------------------------------------------ INTRO */
+let chosen = null;
+$("#crewPick").innerHTML = Object.entries(CREWS).map(([id, c]) =>
+  `<button class="crew-card" data-crew="${id}" aria-pressed="false"><svg class="sigil"><use href="#${c.sigil}"/></svg><span><b>${c.name}</b><small>${c.tagline}</small></span></button>`).join("");
+$("#crewPick").querySelectorAll(".crew-card").forEach(b => b.onclick = () => {
+  chosen = b.dataset.crew;
+  $("#crewPick").querySelectorAll(".crew-card").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  const st = $("#btnStart"); st.disabled = false; st.textContent = `¡Zarpar con ${CREWS[chosen].name}!`;
+});
+$("#btnStart").onclick = () => {
+  if (!chosen) return;
+  audioInit(); setMute(muted);
+  state = freshState(chosen); save();
+  strike(true); showScreen("map");
+};
+const saved = load();
+if (saved) {
+  const b = $("#btnResume"); b.hidden = false;
+  b.textContent = `Continuar con ${CREWS[saved.crew].name}`;
+  b.onclick = () => {
+    audioInit(); state = saved; setMute(muted);
+    if (state.keyDone) { mode = "calm"; showScreen("win"); }
+    else showScreen(state.solved >= 6 ? "final" : "map");
+  };
+  $("#startHint").textContent = "Hay una partida guardada en este dispositivo. Elegir una tripulación nueva la reemplaza.";
+}
+$("#btnSound").onclick = () => { audioInit(); setMute(!muted); };
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (!$("#puzzle").hidden) closePuzzle();
+  else if (!$("#log").hidden) $("#log").hidden = true;
+});
+buildShip();
+setMute(muted);
+})();
+</script>
