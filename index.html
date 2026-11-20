@@ -1,4 +1,12 @@
+<!doctype html>
+<html lang="es">
+<head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1620">
+<style>html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
 <title>La nave Pitágoras</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +25,8 @@
 }
 html,body{height:100%}
 body{background:var(--abyss);color:var(--foam);font-family:var(--font-body);font-size:16px;line-height:1.5;overflow:hidden}
-button{font:inherit;color:inherit;cursor:pointer}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{-webkit-text-size-adjust:100%;overscroll-behavior:none}
 button:focus-visible,[tabindex]:focus-visible,textarea:focus-visible{outline:3px solid var(--brass-hi);outline-offset:3px}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
 #flash{position:fixed;inset:0;background:#dfe9ff;opacity:0;pointer-events:none;z-index:60;transition:opacity .5s ease-out}
@@ -257,6 +266,72 @@ textarea::placeholder{color:var(--ink-soft)}
 .modal h2{font-family:var(--font-display);font-weight:400;font-size:2rem;margin:0}
 .modal p{margin:0;color:var(--mist)}
 
+/* ROUTE LIST (phone navigation) */
+.route-head{display:none;width:100%;max-width:560px;justify-content:space-between;align-items:baseline;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mist);padding:0 4px}
+.route-head b{color:var(--brass-hi);font-family:var(--font-mono);letter-spacing:.04em;font-size:.8rem}
+.route{display:none;list-style:none;margin:0;padding:0;width:100%;max-width:560px;flex-direction:column;gap:8px}
+.stop{width:100%;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb,var(--storm) 92%,transparent);border:1px solid var(--swell-2);text-align:left;min-height:62px}
+.stop .badge{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-weight:700;background:#2a3b4a;color:var(--mist);flex:none}
+.stop-txt{flex:1;min-width:0}
+.stop-txt b{display:block;font-weight:700;font-size:1rem;line-height:1.25}
+.stop-txt small{color:var(--mist);font-size:.82rem}
+.stop-end{flex:none;font-weight:700;display:grid;place-items:center}
+.stop-end svg{width:18px;height:18px;color:var(--mist)}
+.stop.active{border:2px solid var(--brass);box-shadow:0 0 0 4px color-mix(in srgb,var(--brass) 20%,transparent)}
+.stop.active .badge{background:var(--brass);color:var(--ink)}
+.stop.active .stop-end{background:var(--brass);color:var(--ink);border-radius:999px;padding:7px 16px}
+.stop.open .badge{background:var(--kelp);color:var(--abyss)}
+.stop.open .stop-end{font-family:var(--font-display);font-size:1.9rem;line-height:1;color:var(--brass-hi);min-width:38px}
+.stop.locked{background:#0f2031;border-color:#1a3248}
+.stop.locked .stop-txt b{color:#9fb0bd}
+.stop.locked .stop-txt small{color:#6f8494}
+.sheet-actions{margin-left:auto;display:flex;gap:8px;align-self:flex-start}
+.sheet-actions .close-x{margin-left:0}
+.icon-btn{background:var(--swell);border:none;border-radius:50%;width:40px;height:40px;display:grid;place-items:center;flex:none}
+.icon-btn svg{width:20px;height:20px}
+@media (hover:none){.crew-card:hover,.ans:hover:not(:disabled),.tile:hover{transform:none}}
+
+/* PHONE */
+@media (max-width:760px){
+  .hud{flex-wrap:nowrap;gap:6px;padding-block:8px}
+  .route{display:flex}
+  .route-head{display:flex;margin-top:6px}
+  #map{overflow-y:auto;justify-content:flex-start;padding-block:4px 18px;gap:10px;-webkit-overflow-scrolling:touch}
+  .map-title{display:none}
+  .ship-wrap{flex:none;max-height:none;border-radius:18px;overflow:hidden;border:1px solid var(--swell-2);background:linear-gradient(180deg,#09131d,#10273a);box-shadow:0 12px 30px rgba(0,0,0,.45)}
+  #shipSvg{overflow:hidden}
+  .stop{background:var(--storm);border-color:#21405b}
+  .stop.active{box-shadow:0 6px 18px rgba(224,169,63,.18)}
+  .lock .lbl{display:none}
+  .lock .mk{transform:scale(1.6)}
+  .map-title{font-size:1.05rem}
+  .overlay{padding-top:max(8px,env(safe-area-inset-top,0px))}
+  .sheet{height:100%;box-sizing:border-box;border-radius:18px 18px 0 0;padding-top:0}
+  .sheet-head{position:sticky;top:0;z-index:3;background:var(--storm);margin:0 -18px 12px;padding:12px 18px;border-bottom:1px solid var(--swell-2)}
+  #log .sheet-head{background:var(--parchment);border-color:var(--parchment-2)}
+  .sheet-head .padlock{width:34px;height:40px}
+  .sheet-head h2{font-size:1.3rem}
+  #log h2{font-size:1.5rem}
+  .puz-text{font-size:1.02rem}
+  .ans{font-size:1.08rem;padding:12px 10px;min-height:58px}
+  .chip{padding:10px 14px}
+  .reveal .big-letter{font-size:4.5rem}
+  #calc{left:0;right:0;bottom:0;top:auto;width:auto;max-width:none;border-radius:18px 18px 0 0;border-bottom:none;padding:12px max(14px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+  .calc-keys{gap:7px}
+  .calc-keys button{padding:13px 0;font-size:1rem}
+  .calc-keys .fn{font-size:.85rem}
+  .big-key{width:min(200px,55%)}
+  .keybar{padding-block:8px 10px}
+}
+@media (max-width:520px){
+  .crew-tag > div{display:none}
+  .gauge{padding:3px 9px}
+  .gauge small{font-size:.58rem;letter-spacing:.1em}
+  .tool-btn{padding:9px 10px}
+  .cta-row .btn{flex:1 1 100%}
+  #intro{padding-block:14px 30px}
+  .intro-card{gap:18px}
+}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
@@ -325,6 +400,8 @@ textarea::placeholder{color:var(--ink-soft)}
     <section class="screen" id="map" hidden>
       <p class="map-title" id="mapTitle">Toquen el candado que brilla: <b>Candado 1</b></p>
       <div class="ship-wrap"><svg id="shipSvg" viewBox="0 0 1000 560" role="group" aria-label="Mapa de la nave"></svg></div>
+      <div class="route-head" id="routeHead"><span>Ruta de candados</span><b id="routeCount">0 de 6</b></div>
+      <ol class="route" id="route" aria-label="Ruta de candados"></ol>
     </section>
 
     <!-- FINAL -->
@@ -401,17 +478,17 @@ const TOTAL = 40 * 60;
 /* ------------------------------------------------------------------ DATA */
 const LOCKS = [
   { title: "El vigía del palo mayor", place: "Palo mayor", tool: "seno",
-    hint: "Conocen la hipotenusa (el cable) y buscan el cateto <b>opuesto</b> al ángulo: sen θ = opuesto ÷ hipotenusa. Despejen: opuesto = hipotenusa · sen θ." },
+    hint: "El cable es la hipotenusa y la altura es el cateto <b>opuesto</b> al ángulo. ¿Qué razón trigonométrica relaciona esos dos lados?" },
   { title: "La escalera del castillo de proa", place: "Castillo de proa", tool: "coseno",
-    hint: "La distancia a la pared es el cateto <b>adyacente</b> al ángulo: cos θ = adyacente ÷ hipotenusa. Entonces adyacente = hipotenusa · cos θ." },
+    hint: "La distancia a la pared es el cateto <b>adyacente</b> al ángulo." },
   { title: "La rampa de carga", place: "Rampa de carga", tool: "seno",
-    hint: "Conocen el cateto opuesto (la altura) y la hipotenusa (la rampa). Usen la inversa: θ = sen⁻¹(opuesto ÷ hipotenusa)." },
+    hint: "Para encontrar el ángulo tienen que usar el <b>arcoseno</b>." },
   { title: "Los faros de la costa", place: "Faros", tool: "leysenos",
-    hint: "Fíjense qué lado está <b>frente</b> a cada ángulo. El barco–faro B está frente al ángulo A; el barco–faro A está frente al ángulo B. Usen a ÷ sen A = b ÷ sen B." },
+    hint: "Fíjense qué lado está <b>frente</b> a cada ángulo." },
   { title: "Las boyas de la ruta", place: "Boyas", tool: "leysenos",
-    hint: "sen B = b · sen A ÷ a. Luego usen sen⁻¹. Como B es agudo, quédense con el ángulo menor que 90°." },
+    hint: "Para encontrar el ángulo B tienen que usar el <b>arcoseno</b>." },
   { title: "El plano del barco", place: "Camarote", tool: "leycosenos",
-    hint: "Conocen dos lados y el ángulo entre ellos: c² = a² + b² − 2ab · cos C. ¡No olviden sacar la raíz al final!" }
+    hint: "¡No olviden sacar la raíz al final!" }
 ];
 const TOOLS = [
   { id: "seno", label: "Razón seno" },
@@ -487,7 +564,7 @@ function clock(sec) {
 let actx = null, muted = false, rainGain = null;
 try { muted = localStorage.getItem(KEY + "-mute") === "1"; } catch (e) {}
 function audioInit() {
-  if (actx) return;
+  if (actx) { try { actx.resume(); } catch (e) {} return; }
   try {
     actx = new (window.AudioContext || window.webkitAudioContext)();
     const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
@@ -525,6 +602,11 @@ const sfx = {
   win() { [392, 523, 659, 784, 659, 784, 1046].forEach((f, i) => tone(f, i * .15, .7, "triangle", .14)); },
   bottle() { tone(880, 0, .3, "sine", .08, 1320); tone(1320, .15, .4, "sine", .06, 990); }
 };
+let wakeLock = null;
+async function keepAwake() { try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && state && !state.finishedAt) { keepAwake(); tick(); }
+});
 function setMute(m) {
   muted = m; try { localStorage.setItem(KEY + "-mute", m ? "1" : "0"); } catch (e) {}
   $("#soundIco").innerHTML = `<use href="#${m ? "i-mute" : "i-sound"}"/>`;
@@ -593,7 +675,7 @@ const LOCK_POS = [[478, 62], [742, 268], [590, 392], [112, 160], [905, 330], [28
 function wavePath(y, amp, len, w0 = -300, w1 = 1500) {
   let d = `M${w0} ${y}`;
   for (let x = w0; x < w1; x += len) d += ` q ${len / 4} ${-amp} ${len / 2} 0 t ${len / 2} 0`;
-  return d + ` L${w1} 600 L${w0} 600 Z`;
+  return d + ` L${w1} 560 L${w0} 560 Z`;
 }
 function padlockShape(cls = "") {
   return `<g class="${cls}"><path class="body" d="M-13 -4 h26 a3 3 0 0 1 3 3 v18 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-18 a3 3 0 0 1 3 -3z"/>
@@ -667,9 +749,9 @@ function buildShip() {
     g.setAttribute("class", "lock"); g.setAttribute("tabindex", "0"); g.setAttribute("role", "button"); g.dataset.i = i;
     g.setAttribute("transform", `translate(${x} ${y})`);
     const lblY = (i === 0 || i === 2) ? -46 : 56;
-    g.innerHTML = `<circle class="glow" r="40"/><circle class="ring" r="32"/>
+    g.innerHTML = `<g class="mk"><circle class="glow" r="40"/><circle class="ring" r="32"/>
       <g transform="translate(0 -2) scale(1.05)">${padlockShape()}</g>
-      <text class="num" text-anchor="middle" y="18" font-size="13">${i + 1}</text>
+      <text class="num" text-anchor="middle" y="18" font-size="13">${i + 1}</text></g>
       <text class="lbl" text-anchor="middle" y="${lblY}">${LOCKS[i].place}</text>`;
     // number sits on the lock body
     g.querySelector(".num").setAttribute("y", "14");
@@ -690,6 +772,17 @@ function refreshMap() {
   $("#mapTitle").innerHTML = state.solved < 6
     ? `Toquen el candado que brilla: <b>Candado ${state.solved + 1} · ${LOCKS[state.solved].title}</b>`
     : `¡Los 6 candados están abiertos! <b>Forjen la llave</b>`;
+  const lockIco = `<svg viewBox="-16 -16 32 32" aria-hidden="true">${padlockShape().replace(/class="body"/g, 'fill="currentColor"')}</svg>`;
+  $("#route").innerHTML = LOCKS.map((L, i) => {
+    const st = i < state.solved ? "open" : i === state.solved ? "active" : "locked";
+    const sub = st === "open" ? "Abierto" : st === "active" ? "¡Les toca este!" : "Bloqueado";
+    const end = st === "open" ? crew().word[i] : st === "active" ? "Abrir" : lockIco;
+    return `<li><button class="stop ${st}" data-i="${i}"><span class="badge">${st === "open" ? "✓" : i + 1}</span>
+      <span class="stop-txt"><b>${L.title}</b><small>${L.place} · ${sub}</small></span><span class="stop-end">${end}</span></button></li>`;
+  }).join("") + (state.solved >= 6 ? `<li><button class="btn btn-brass" style="width:100%" id="routeForge">Forjar la llave</button></li>` : "");
+  $("#routeCount").textContent = `${Math.min(state.solved, 6)} de 6 abiertos`;
+  $("#route").querySelectorAll(".stop").forEach(b => b.onclick = () => tryOpen(+b.dataset.i));
+  const rf = $("#routeForge"); if (rf) rf.onclick = () => showScreen("final");
   renderSlots();
 }
 function renderSlots() {
@@ -781,13 +874,14 @@ function openPuzzle(i) {
   openIdx = i; renderPuzzle(); $("#puzzle").hidden = false;
   setTimeout(() => $("#puzSheet .close-x")?.focus(), 50);
 }
-function closePuzzle() { $("#puzzle").hidden = true; openIdx = -1; refreshMap(); }
+function closePuzzle() { $("#puzzle").hidden = true; $("#calc").hidden = true; openIdx = -1; refreshMap(); }
 function renderPuzzle(justSolved) {
   const i = openIdx, L = LOCKS[i], c = crew(), st = state.locks[i], p = c.p[i];
   const solved = i < state.solved;
   const procOk = true;
   let h = `<div class="sheet-head">${padlockBig(solved && !justSolved)}<div><span class="eyebrow">Candado ${i + 1} de 6</span><h2 id="puzTitle">${L.title}</h2></div>
-    <button class="close-x" aria-label="Volver al barco"><svg><use href="#i-x"/></svg></button></div>
+    <div class="sheet-actions"><button class="icon-btn calc-open" aria-label="Calculadora"><svg><use href="#i-calc"/></svg></button>
+    <button class="close-x" aria-label="Volver al barco"><svg><use href="#i-x"/></svg></button></div></div>
     <div class="puz-grid"><div>
       <p class="puz-text">${TEXT[i](p)}</p>
       <figure class="diagram" style="margin:0">${diagramFor(i, p)}<figcaption>Diagrama aproximado, no a escala exacta</figcaption></figure>
@@ -819,6 +913,7 @@ function renderPuzzle(justSolved) {
   const sheet = $("#puzSheet"); sheet.innerHTML = h;
   if (justSolved) requestAnimationFrame(() => setTimeout(() => sheet.querySelector(".padlock").classList.add("opened"), 60));
   sheet.querySelector(".close-x").onclick = closePuzzle;
+  sheet.querySelector(".calc-open").onclick = () => { $("#calc").hidden = !$("#calc").hidden; };
   sheet.querySelectorAll(".chip").forEach(b => b.onclick = () => pickTool(b));
   const pb = $("#procBox");
   if (pb) pb.oninput = () => {
@@ -852,6 +947,7 @@ function answer(k, btn) {
   } else {
     st.wrong.push(k); st.errors++; state.errors++; save();
     sfx.wrong(); flashScreen();
+    try { navigator.vibrate && navigator.vibrate([120, 60, 200]); } catch (e) {}
     btn.classList.add("wrong"); btn.disabled = true;
     toast(SHIP_MSGS[Math.floor(Math.random() * SHIP_MSGS.length)] + " Revisen su procedimiento.", "−1:00");
     tick();
@@ -1083,14 +1179,14 @@ $("#btnStart").onclick = () => {
   if (!chosen) return;
   audioInit(); setMute(muted);
   state = freshState(chosen); save();
-  strike(true); showScreen("map");
+  strike(true); keepAwake(); showScreen("map");
 };
 const saved = load();
 if (saved) {
   const b = $("#btnResume"); b.hidden = false;
   b.textContent = `Continuar con ${CREWS[saved.crew].name}`;
   b.onclick = () => {
-    audioInit(); state = saved; setMute(muted);
+    audioInit(); state = saved; setMute(muted); keepAwake();
     if (state.keyDone) { mode = "calm"; showScreen("win"); }
     else showScreen(state.solved >= 6 ? "final" : "map");
   };
@@ -1106,3 +1202,6 @@ buildShip();
 setMute(muted);
 })();
 </script>
+
+</body>
+</html>
